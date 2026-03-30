@@ -31,6 +31,8 @@ export interface Database {
           phone: string | null
           date_of_birth: string | null
           base_role: 'super_admin' | 'studio_admin' | 'instructor' | 'customer'
+          notification_preference: 'email' | 'sms' | 'both'
+          phone_verified: boolean
           created_at: string
         }
         Insert: Omit<Database['public']['Tables']['users']['Row'], 'created_at'>
@@ -88,6 +90,7 @@ export interface Database {
           ends_at: string
           capacity: number
           status: 'scheduled' | 'cancelled' | 'completed' | 'studio_reserved'
+          display_title: string | null
           notes: string | null
           created_at: string
         }
