@@ -27,7 +27,7 @@ export const getTenant = cache(async (): Promise<Tenant | null> => {
 export async function getTenantSettings(): Promise<TenantSettings | null> {
   const tenant = await getTenant()
   if (!tenant) return null
-  return tenant.settings as TenantSettings
+  return tenant.settings as unknown as TenantSettings
 }
 
 /**
@@ -41,15 +41,19 @@ export const getCurrentUser = cache(async () => {
 
   const { data: user } = await supabase
     .from('users')
-    .select('*, user_permissions(permission)')
+    .select('*')
     .eq('id', authUser.id)
     .single()
 
   if (!user) return null
 
+  const { data: perms } = await supabase
+    .from('user_permissions')
+    .select('permission')
+    .eq('user_id', authUser.id)
+
   return {
     ...user,
-    extra_permissions: (user.user_permissions as { permission: string }[])
-      .map((p) => p.permission),
+    extra_permissions: (perms ?? []).map((p) => p.permission),
   }
 })
