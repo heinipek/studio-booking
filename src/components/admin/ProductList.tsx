@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { Product } from '@/types/database'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -59,8 +58,7 @@ export function ProductList({ tenantId, products: initial }: Props) {
   }
 
   async function save() {
-    if (!form.name.trim() || !form.price_cents) return
-    const supabase = createClient()
+    if (!form.name.trim() || !form.price_cents || !form.credits || !form.validity_days) return
     const payload = {
       tenant_id: tenantId,
       name: form.name,
@@ -73,27 +71,29 @@ export function ProductList({ tenantId, products: initial }: Props) {
     }
 
     if (editingId) {
-      const { data } = await supabase.from('products').update(payload).eq('id', editingId).select().single()
-      if (data) setProducts((prev) => prev.map((p) => p.id === editingId ? data : p))
+      const res = await fetch('/api/admin/products', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editingId, ...payload }) })
+      if (!res.ok) { alert(`Virhe: ${(await res.json()).error}`); return }
+      const data: Product = await res.json()
+      setProducts((prev) => prev.map((p) => p.id === editingId ? data : p))
     } else {
-      const { data } = await supabase.from('products').insert(payload).select().single()
-      if (data) setProducts((prev) => [...prev, data])
+      const res = await fetch('/api/admin/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      if (!res.ok) { alert(`Virhe: ${(await res.json()).error}`); return }
+      const data: Product = await res.json()
+      setProducts((prev) => [...prev, data])
     }
     resetForm()
     router.refresh()
   }
 
   async function toggleActive(product: Product) {
-    const supabase = createClient()
-    await supabase.from('products').update({ active: !product.active }).eq('id', product.id)
-    setProducts((prev) => prev.map((p) => p.id === product.id ? { ...p, active: !p.active } : p))
+    const res = await fetch('/api/admin/products', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: product.id, active: !product.active }) })
+    if (res.ok) setProducts((prev) => prev.map((p) => p.id === product.id ? { ...p, active: !p.active } : p))
   }
 
   async function remove(id: string) {
     if (!confirm('Poistetaanko tuote?')) return
-    const supabase = createClient()
-    await supabase.from('products').delete().eq('id', id)
-    setProducts((prev) => prev.filter((p) => p.id !== id))
+    const res = await fetch('/api/admin/products', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+    if (res.ok) setProducts((prev) => prev.filter((p) => p.id !== id))
   }
 
   function startEdit(product: Product) {
@@ -200,8 +200,8 @@ function ProductForm({ form, setForm, onSave, onCancel }: {
             <Input type="number" step="0.01" min="0" value={form.price_cents} onChange={(e) => setForm({ ...form, price_cents: e.target.value })} placeholder="149.00" className="h-8 text-sm" />
           </div>
           <div className="space-y-1">
-            <Label className="text-xs">Kerrat</Label>
-            <Input type="number" min="1" value={form.credits} onChange={(e) => setForm({ ...form, credits: e.target.value })} className="h-8 text-sm" />
+            <Label className="text-xs">Käyntikerrat (kpl)</Label>
+            <Input type="number" min="1" value={form.credits} onChange={(e) => setForm({ ...form, credits: e.target.value })} placeholder="esim. 10" className="h-8 text-sm" />
           </div>
           <div className="space-y-1">
             <Label className="text-xs">Voimassaolo (päivää)</Label>

@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -67,10 +66,28 @@ export function SessionForm({ tenantId, classTypes, instructors, defaultValues, 
       return
     }
 
-    const supabase = createClient()
+    // Salinvaraukselle käytetään ensimmäistä tuntityyppiä tai luodaan placeholder API:n kautta
+    let resolvedClassTypeId = classTypeId
+    if (isReserved) {
+      if (classTypes.length === 0) {
+        const ctRes = await fetch('/api/admin/class-types', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: 'Salinvaraus', color: '#94a3b8', min_participants: 1 }),
+        })
+        if (!ctRes.ok) {
+          setError(`Virhe: ${(await ctRes.json()).error}`)
+          setLoading(false)
+          return
+        }
+        resolvedClassTypeId = (await ctRes.json()).id
+      } else {
+        resolvedClassTypeId = classTypes[0]!.id
+      }
+    }
+
     const payload = {
-      tenant_id: tenantId,
-      class_type_id: isReserved ? (classTypes[0]?.id ?? null) : classTypeId,
+      class_type_id: resolvedClassTypeId,
       instructor_id: instructorId || null,
       starts_at: new Date(startsAt).toISOString(),
       ends_at: new Date(endsAt).toISOString(),
@@ -80,12 +97,12 @@ export function SessionForm({ tenantId, classTypes, instructors, defaultValues, 
       notes: notes || null,
     }
 
-    const { error: dbError } = sessionId
-      ? await supabase.from('class_sessions').update(payload).eq('id', sessionId)
-      : await supabase.from('class_sessions').insert(payload)
+    const res = sessionId
+      ? await fetch('/api/admin/sessions', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: sessionId, ...payload }) })
+      : await fetch('/api/admin/sessions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
 
-    if (dbError) {
-      setError('Tallennus epäonnistui. Yritä uudelleen.')
+    if (!res.ok) {
+      setError(`Virhe: ${(await res.json()).error}`)
       setLoading(false)
       return
     }

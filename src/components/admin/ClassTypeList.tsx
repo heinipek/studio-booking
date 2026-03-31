@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { ClassType } from '@/types/database'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -33,39 +32,32 @@ export function ClassTypeList({ tenantId, classTypes: initial }: Props) {
 
   async function save() {
     if (!form.name.trim()) return
-    const supabase = createClient()
+    const body = { name: form.name, category: form.category || null, color: form.color, min_participants: parseInt(form.min_participants) }
 
     if (editingId) {
-      const { data } = await supabase
-        .from('class_types')
-        .update({ name: form.name, category: form.category || null, color: form.color, min_participants: parseInt(form.min_participants) })
-        .eq('id', editingId)
-        .select()
-        .single()
-      if (data) setClassTypes((prev) => prev.map((ct) => ct.id === editingId ? data : ct))
+      const res = await fetch('/api/admin/class-types', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editingId, ...body }) })
+      if (!res.ok) { alert(`Virhe: ${(await res.json()).error}`); return }
+      const data: ClassType = await res.json()
+      setClassTypes((prev) => prev.map((ct) => ct.id === editingId ? data : ct))
     } else {
-      const { data } = await supabase
-        .from('class_types')
-        .insert({ tenant_id: tenantId, name: form.name, category: form.category || null, color: form.color, min_participants: parseInt(form.min_participants) })
-        .select()
-        .single()
-      if (data) setClassTypes((prev) => [...prev, data])
+      const res = await fetch('/api/admin/class-types', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      if (!res.ok) { alert(`Virhe: ${(await res.json()).error}`); return }
+      const data: ClassType = await res.json()
+      setClassTypes((prev) => [...prev, data])
     }
     resetForm()
     router.refresh()
   }
 
   async function toggleActive(ct: ClassType) {
-    const supabase = createClient()
-    await supabase.from('class_types').update({ active: !ct.active }).eq('id', ct.id)
-    setClassTypes((prev) => prev.map((c) => c.id === ct.id ? { ...c, active: !c.active } : c))
+    const res = await fetch('/api/admin/class-types', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: ct.id, active: !ct.active }) })
+    if (res.ok) setClassTypes((prev) => prev.map((c) => c.id === ct.id ? { ...c, active: !c.active } : c))
   }
 
   async function remove(id: string) {
     if (!confirm('Poistetaanko tuntityyppi?')) return
-    const supabase = createClient()
-    await supabase.from('class_types').delete().eq('id', id)
-    setClassTypes((prev) => prev.filter((c) => c.id !== id))
+    const res = await fetch('/api/admin/class-types', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+    if (res.ok) setClassTypes((prev) => prev.filter((c) => c.id !== id))
   }
 
   function startEdit(ct: ClassType) {

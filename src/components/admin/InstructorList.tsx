@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { Instructor } from '@/types/database'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -38,40 +37,33 @@ export function InstructorList({ tenantId, instructors: initial }: Props) {
 
   async function save() {
     if (!form.name.trim()) return
-    const supabase = createClient()
     const specialties = form.specialties.split(',').map((s) => s.trim()).filter(Boolean)
+    const body = { name: form.name, bio: form.bio || null, specialties }
 
     if (editingId) {
-      const { data } = await supabase
-        .from('instructors')
-        .update({ name: form.name, bio: form.bio || null, specialties })
-        .eq('id', editingId)
-        .select()
-        .single()
-      if (data) setInstructors((prev) => prev.map((i) => i.id === editingId ? data : i))
+      const res = await fetch('/api/admin/instructors', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: editingId, ...body }) })
+      if (!res.ok) { alert(`Virhe: ${(await res.json()).error}`); return }
+      const data: Instructor = await res.json()
+      setInstructors((prev) => prev.map((i) => i.id === editingId ? data : i))
     } else {
-      const { data } = await supabase
-        .from('instructors')
-        .insert({ tenant_id: tenantId, name: form.name, bio: form.bio || null, specialties })
-        .select()
-        .single()
-      if (data) setInstructors((prev) => [...prev, data])
+      const res = await fetch('/api/admin/instructors', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      if (!res.ok) { alert(`Virhe: ${(await res.json()).error}`); return }
+      const data: Instructor = await res.json()
+      setInstructors((prev) => [...prev, data])
     }
     resetForm()
     router.refresh()
   }
 
   async function toggleActive(instructor: Instructor) {
-    const supabase = createClient()
-    await supabase.from('instructors').update({ active: !instructor.active }).eq('id', instructor.id)
-    setInstructors((prev) => prev.map((i) => i.id === instructor.id ? { ...i, active: !i.active } : i))
+    const res = await fetch('/api/admin/instructors', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: instructor.id, active: !instructor.active }) })
+    if (res.ok) setInstructors((prev) => prev.map((i) => i.id === instructor.id ? { ...i, active: !i.active } : i))
   }
 
   async function remove(id: string) {
     if (!confirm('Poistetaanko ohjaaja?')) return
-    const supabase = createClient()
-    await supabase.from('instructors').delete().eq('id', id)
-    setInstructors((prev) => prev.filter((i) => i.id !== id))
+    const res = await fetch('/api/admin/instructors', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
+    if (res.ok) setInstructors((prev) => prev.filter((i) => i.id !== id))
   }
 
   function startEdit(instructor: Instructor) {

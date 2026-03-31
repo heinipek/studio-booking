@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { MoreHorizontal, Pencil, Trash2, XCircle } from 'lucide-react'
 import {
   DropdownMenu,
@@ -24,11 +23,7 @@ export function SessionActions({ sessionId, status }: Props) {
   async function cancelSession() {
     if (!confirm('Perutaanko tämä tunti? Asiakkaille lähetetään ilmoitus.')) return
     setLoading(true)
-    const supabase = createClient()
-    await supabase
-      .from('class_sessions')
-      .update({ status: 'cancelled' })
-      .eq('id', sessionId)
+    await fetch('/api/admin/sessions', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: sessionId, status: 'cancelled' }) })
     router.refresh()
     setLoading(false)
   }
@@ -36,8 +31,7 @@ export function SessionActions({ sessionId, status }: Props) {
   async function deleteSession() {
     if (!confirm('Poistetaanko tämä tunti pysyvästi?')) return
     setLoading(true)
-    const supabase = createClient()
-    await supabase.from('class_sessions').delete().eq('id', sessionId)
+    await fetch('/api/admin/sessions', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: sessionId }) })
     router.refresh()
     setLoading(false)
   }
